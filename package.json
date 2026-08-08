@@ -1,0 +1,12 @@
+{
+  "name": "network-e2e-tests",
+  "version": "1.0.0",
+  "description": "E2E tests for network mesh connectivity",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node tests/connectivity.test.js",
+    "start": "node src/index.js"
+  },
+  "keywords": ["testing", "network", "integration"],
+  "license": "MIT"
+}
