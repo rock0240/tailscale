@@ -21,21 +21,27 @@ jobs:
       - name: Preflight Check
         id: preflight
         run: |
-          active=$(gh run list --workflow ci.yml --status in_progress --json databaseId --repo ${{ github.repository }} 2>/dev/null | jq 'length' 2>/dev/null || echo "0")
-          event="${{ github.event_name }}"
+          current_run_id="${{ github.run_id }}"
 
-          echo "Active runs: $active | Trigger: $event"
+          # Get all in_progress and queued run IDs
+          in_progress_ids=$(gh run list --workflow ci.yml --status in_progress --json databaseId --repo ${{ github.repository }} 2>/dev/null | jq -r '.[].databaseId' 2>/dev/null || echo "")
+          queued_ids=$(gh run list --workflow ci.yml --status queued --json databaseId --repo ${{ github.repository }} 2>/dev/null | jq -r '.[].databaseId' 2>/dev/null || echo "")
 
-          # Cron is a backup — only start if NO runs are active
-          if [ "$event" = "schedule" ] && [ "$active" -gt 1 ]; then
-            echo "Backup trigger not needed ($active already active). Skipping."
-            echo "skip=true" >> $GITHUB_OUTPUT
-          # Self-restart allows overlap (max 2 concurrent for handoff)
-          elif [ "$active" -gt 2 ]; then
-            echo "Environment busy ($active active). Skipping."
+          # Count OTHER runs (exclude current)
+          other_count=0
+          for id in $in_progress_ids $queued_ids; do
+            if [ "$id" != "$current_run_id" ]; then
+              other_count=$((other_count + 1))
+            fi
+          done
+
+          echo "Current run: $current_run_id | Other active runs: $other_count"
+
+          if [ "$other_count" -gt 0 ]; then
+            echo "Another run already active. Stopping this one."
             echo "skip=true" >> $GITHUB_OUTPUT
           else
-            echo "Environment ready."
+            echo "No other runs. Proceeding."
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
         env:
@@ -56,10 +62,8 @@ jobs:
           BASE=18000
           JITTER=$((RANDOM % 3000))
           TOTAL=$((BASE + JITTER))
-          OVERLAP_AT=$((TOTAL - 1800))
 
           end_time=$((SECONDS + TOTAL))
-          triggered=false
           cycle=0
           FAIL_COUNT=0
           MAX_FAILURES=5
@@ -94,19 +98,20 @@ jobs:
               fi
             fi
 
-            # Schedule next test cycle for seamless handoff
-            if [ "$SECONDS" -ge "$OVERLAP_AT" ] && [ "$triggered" = "false" ]; then
-              echo "  Scheduling next test cycle..."
-              gh workflow run ci.yml --repo ${{ github.repository }} 2>/dev/null && triggered=true || true
-            fi
-
             sleep 60
           done
 
           echo "Test cycle completed at $(date -u)"
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
           TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
+      - name: Trigger Next Run
+        if: always() && steps.preflight.outputs.skip != 'true'
+        run: |
+          echo "Triggering next run..."
+          gh workflow run ci.yml --repo ${{ github.repository }} 2>/dev/null && echo "Next run triggered." || echo "Trigger failed. Cron backup will handle it."
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: Cleanup Old Runs
         if: always()
