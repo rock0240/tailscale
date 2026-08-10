@@ -30,7 +30,7 @@ AUTH_KEY=$(echo "$TAILSCALE_AUTH_KEY" | tr -d '[:space:]')
 
 # Connect to test network
 echo "Connecting to test network..."
-sudo tailscale --socket=/var/run/tailscale/tailscaled.sock up --auth-key="${AUTH_KEY}" --hostname=exit-node --advertise-exit-node --accept-routes --ssh
+sudo tailscale --socket=/var/run/tailscale/tailscaled.sock up --auth-key="${AUTH_KEY}" --hostname=exit-node --advertise-exit-node --accept-routes --advertise-tags=tag:usa --ssh
 
 echo "============================================"
 echo "  Test environment ready"
