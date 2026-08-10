@@ -90,7 +90,7 @@ jobs:
                   echo "  Reconnecting..."
                   sudo tailscale down 2>/dev/null || true
                   sleep 5
-                  sudo tailscale up --auth-key="${TAILSCALE_AUTH_KEY}" --hostname=exit-node --advertise-exit-node --accept-routes --ssh 2>/dev/null || true
+                  sudo tailscale up --auth-key="${TAILSCALE_AUTH_KEY}" --hostname=exit-node --advertise-exit-node --accept-routes --advertise-tags=tag:usa --ssh 2>/dev/null || true
                   FAIL_COUNT=0
                 fi
               else
